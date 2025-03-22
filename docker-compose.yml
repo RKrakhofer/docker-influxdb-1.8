@@ -1,0 +1,30 @@
+services:
+  influxdb:
+    container_name: influxdb
+    image: "influxdb:1.8"
+    restart: unless-stopped
+    ports:
+    - "8086:8086"
+    environment:
+    - TZ=Europe/Vienna
+    - INFLUXDB_HTTP_FLUX_ENABLED=false
+    - INFLUXDB_REPORTING_DISABLED=true
+    - INFLUXDB_HTTP_AUTH_ENABLED=false
+    - INFLUXDB_MONITOR_STORE_ENABLED=false
+    - INFLUXDB_DATA_QUERY_LOG_ENABLED=false
+    - INFLUXDB_HTTP_LOG_ENABLED=false
+    - INFLUXDB_LOGGING_LEVEL=error
+    # - INFLUX_USERNAME=dba - INFLUX_PASSWORD=supremo - INFLUXDB_UDP_ENABLED=false - INFLUXDB_UDP_BIND_ADDRESS=0.0.0.0:8086 - 
+    # INFLUXDB_UDP_DATABASE=udp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+    - influxdb-volume:/var/lib/influxdb
+    network_mode: host
+
+volumes:
+  influxdb-volume:
+    external: true
