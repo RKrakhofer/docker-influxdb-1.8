@@ -23,7 +23,7 @@ services:
       retries: 3
     volumes:
     - influxdb-volume:/var/lib/influxdb
-    network_mode: host
+    network_mode: bridge
 
 volumes:
   influxdb-volume:
