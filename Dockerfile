@@ -18,6 +18,11 @@ RUN set -ex && \
 RUN mkdir -p /var/lib/influxdb && \
     chown -R influxdb:influxdb /var/lib/influxdb
 
+# UID/GID des influxdb Users an das vorhandene Volume anpassen (144:153)
+RUN groupmod -g 153 influxdb && \
+    usermod -u 144 -g 153 influxdb && \
+    chown -R influxdb:influxdb /var/lib/influxdb
+
 # Expose InfluxDB Ports
 EXPOSE 8086
 
