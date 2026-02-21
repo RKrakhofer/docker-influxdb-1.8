@@ -83,6 +83,50 @@ The Docker Compose file uses an external volume for the InfluxDB data. Ensure th
 
 If you encounter any issues, ensure that the environment variables are correctly set and that the InfluxDB configuration is correct.
 
+### Analyze Fields Script
+
+The repository includes `analyze_influx_fields.sh`, a helper script that inspects your InfluxDB 1.8 database and generates a matrix of:
+
+- Retention Policy
+- Measurement
+- Field keys
+
+It creates a Markdown report file named `influx_rp_measurement_fields.md`.
+
+#### What the script does
+
+1. Queries all retention policies with `SHOW RETENTION POLICIES`.
+2. Queries all measurements with `SHOW MEASUREMENTS`.
+3. Iterates over every RP/measurement combination.
+4. Runs `SHOW FIELD KEYS FROM "<rp>"."<measurement>"`.
+5. Writes only combinations that actually have fields into a Markdown table.
+6. Appends a short summary (total RPs, measurements, combinations, and combinations with data).
+
+#### Prerequisites
+
+- `curl`
+- `jq`
+- Network access to the InfluxDB HTTP API (`:8086` by default)
+
+#### Configuration in script
+
+At the top of `analyze_influx_fields.sh`, adjust these values if needed:
+
+- `INFLUX_HOST` (default: `reserve`)
+- `INFLUX_PORT` (default: `8086`)
+- `INFLUX_DB` (default: `database`)
+
+#### Run
+
+```sh
+chmod +x analyze_influx_fields.sh
+./analyze_influx_fields.sh
+```
+
+The script prints progress to stderr and writes the final report to:
+
+- `influx_rp_measurement_fields.md`
+
 ### Rebuild after Dockerfile Changes
 
 ```sh

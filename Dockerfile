@@ -7,8 +7,6 @@ ENV INFLUXDB_VERSION=1.8.10
 
 # InfluxDB herunterladen und installieren
 RUN set -ex && \
-    # Erforderliche Verzeichnisse für dpkg Post-Installation Script erstellen \
-    mkdir -p /etc/init.d && \
     ARCH=$(dpkg --print-architecture) && \
     wget --no-verbose https://dl.influxdata.com/influxdb/releases/influxdb_${INFLUXDB_VERSION}_${ARCH}.deb && \
     dpkg -i influxdb_${INFLUXDB_VERSION}_${ARCH}.deb && \
@@ -16,11 +14,6 @@ RUN set -ex && \
 
 # InfluxDB User und Verzeichnisse vorbereiten
 RUN mkdir -p /var/lib/influxdb && \
-    chown -R influxdb:influxdb /var/lib/influxdb
-
-# UID/GID des influxdb Users an das vorhandene Volume anpassen (144:153)
-RUN groupmod -g 153 influxdb && \
-    usermod -u 144 -g 153 influxdb && \
     chown -R influxdb:influxdb /var/lib/influxdb
 
 # Expose InfluxDB Ports
