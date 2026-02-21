@@ -8,6 +8,48 @@ INFLUX_DB="database"
 # Output file
 OUTPUT="influx_rp_measurement_fields.md"
 
+# Function to convert timestamp to smart relative time
+smart_relative_time() {
+  local timestamp="$1"
+  
+  # Remove nanoseconds from InfluxDB format (2025-08-17T06:23:20.645022307Z -> 2025-08-17T06:23:20Z)
+  timestamp=$(echo "$timestamp" | sed 's/\.[0-9]*Z/Z/')
+  
+  # Convert ISO8601 to epoch (BusyBox date requires -D for format specification)
+  # Use TZ=UTC to ensure the timestamp is interpreted as UTC (the "Z" suffix means UTC)
+  local then=$(TZ=UTC date -D "%Y-%m-%dT%H:%M:%SZ" -d "$timestamp" +%s 2>/dev/null)
+  if [ -z "$then" ]; then
+    echo "unknown"
+    return
+  fi
+  
+  local now=$(date +%s)
+  local diff=$((now - then))
+  
+  # Calculate time units
+  local minutes=$((diff / 60))
+  local hours=$((diff / 3600))
+  local days=$((diff / 86400))
+  local weeks=$((diff / 604800))
+  local months=$((diff / 2592000))  # ~30 days
+  local years=$((diff / 31536000))
+  
+  # Smart formatting based on age
+  if [ $diff -lt 3600 ]; then
+    echo "${minutes}m ago"
+  elif [ $diff -lt 86400 ]; then
+    echo "${hours}h ago"
+  elif [ $diff -lt 604800 ]; then
+    echo "${days}d ago"
+  elif [ $diff -lt 2592000 ]; then
+    echo "${weeks}w ago"
+  elif [ $diff -lt 31536000 ]; then
+    echo "${months}mo ago"
+  else
+    echo "${years}y ago"
+  fi
+}
+
 echo "Fetching retention policies from database '$INFLUX_DB'..." >&2
 # Fetch all Retention Policies dynamically
 RPS_JSON=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
@@ -47,8 +89,8 @@ echo "Database: **database**" >> $OUTPUT
 echo "" >> $OUTPUT
 echo "Generated: $(date)" >> $OUTPUT
 echo "" >> $OUTPUT
-echo "| Retention Policy | Measurement | Fields |" >> $OUTPUT
-echo "|-----------------|-------------|--------|" >> $OUTPUT
+echo "| Retention Policy | Measurement | Fields | Last Written |" >> $OUTPUT
+echo "|-----------------|-------------|--------|--------------|" >> $OUTPUT
 
 # Counter for progress
 total=$((${#RPS[@]} * ${#MEASUREMENTS[@]}))
@@ -69,9 +111,24 @@ for rp in "${RPS[@]}"; do
     # Extract field names from JSON response
     fields=$(echo "$result" | jq -r '.results[0].series[0].values[]?[0]' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
     
-    # Only add to table if fields exist
+    # Only process if fields exist
     if [ -n "$fields" ]; then
-      echo "| $rp | $measurement | $fields |" >> $OUTPUT
+      # Query for last timestamp
+      last_query="SELECT * FROM \"$rp\".\"$measurement\" ORDER BY time DESC LIMIT 1"
+      last_result=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
+        --data-urlencode "db=$INFLUX_DB" \
+        --data-urlencode "q=$last_query")
+      
+      # Extract timestamp
+      last_time=$(echo "$last_result" | jq -r '.results[0].series[0].values[0][0]' 2>/dev/null)
+      
+      if [ "$last_time" != "null" ] && [ -n "$last_time" ]; then
+        relative_time=$(smart_relative_time "$last_time")
+      else
+        relative_time="never"
+      fi
+      
+      echo "| $rp | $measurement | $fields | $relative_time |" >> $OUTPUT
     fi
   done
 done

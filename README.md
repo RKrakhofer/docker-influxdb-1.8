@@ -90,6 +90,7 @@ The repository includes `analyze_influx_fields.sh`, a helper script that inspect
 - Retention Policy
 - Measurement
 - Field keys
+- Last write timestamp (smart relative format)
 
 It creates a Markdown report file named `influx_rp_measurement_fields.md`.
 
@@ -99,8 +100,10 @@ It creates a Markdown report file named `influx_rp_measurement_fields.md`.
 2. Queries all measurements with `SHOW MEASUREMENTS`.
 3. Iterates over every RP/measurement combination.
 4. Runs `SHOW FIELD KEYS FROM "<rp>"."<measurement>"`.
-5. Writes only combinations that actually have fields into a Markdown table.
-6. Appends a short summary (total RPs, measurements, combinations, and combinations with data).
+5. Queries last data point with `SELECT * FROM "<rp>"."<measurement>" ORDER BY time DESC LIMIT 1`.
+6. Formats the timestamp as smart relative time (e.g., "5m ago", "3h ago", "2d ago", "3w ago", "5mo ago", "2y ago").
+7. Writes only combinations that actually have fields into a Markdown table.
+8. Appends a short summary (total RPs, measurements, combinations, and combinations with data).
 
 #### Prerequisites
 
