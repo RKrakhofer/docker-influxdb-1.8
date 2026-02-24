@@ -144,4 +144,43 @@ combinations_with_data=$(grep -c '^|' $OUTPUT)
 combinations_with_data=$((combinations_with_data - 2))  # Subtract header and separator lines
 echo "- Combinations with Data: $combinations_with_data" >> $OUTPUT
 
+# Fetch and write Continuous Queries
+echo "Fetching continuous queries..." >&2
+CQS_JSON=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
+  --data-urlencode "q=SHOW CONTINUOUS QUERIES")
+
+echo "" >> $OUTPUT
+echo "---" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "## Continuous Queries" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "| Name | Interval | Source (RP.Measurement) | Destination (RP.Measurement) |" >> $OUTPUT
+echo "|------|----------|------------------------|------------------------------|" >> $OUTPUT
+
+echo "$CQS_JSON" | jq -r '
+  .results[0].series[]? |
+  select(.name == "database") |
+  .values[]? |
+  .[1]
+' | while IFS= read -r query; do
+  name=$(echo "$query" | sed -n 's/.*CONTINUOUS QUERY \([^ ]*\).*/\1/p')
+  interval=$(echo "$query" | sed -n 's/.*GROUP BY time(\([^)]*\)).*/\1/p')
+  src=$(echo "$query" | sed -n 's/.*FROM "database"\.\([^ ]*\).*/\1/p' | head -1)
+  dst=$(echo "$query" | sed -n 's/.*INTO "database"\.\([^ ]*\).*/\1/p' | head -1)
+  echo "| $name | $interval | $src | $dst |" >> $OUTPUT
+done
+
+cq_count=$(echo "$CQS_JSON" | jq '[.results[0].series[]? | select(.name == "database") | .values[]?] | length')
+echo "- Continuous Queries: ${cq_count:-0}" >> $OUTPUT
+
+echo "" >> $OUTPUT
+echo "### Continuous Query Details" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "$CQS_JSON" | jq -r '
+  .results[0].series[]? |
+  select(.name == "database") |
+  .values[]? |
+  "**\(.[0])**\n```sql\n\(.[1])\n```\n"
+' >> $OUTPUT
+
 echo "Done! Results saved to $OUTPUT"
