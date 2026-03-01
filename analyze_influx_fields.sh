@@ -1,7 +1,12 @@
 #!/bin/bash
+#
+# Analyzes InfluxDB retention policies, measurements, and fields
+# Usage: ./analyze_influx_fields.sh [INFLUX_HOST]
+#   INFLUX_HOST: Optional, defaults to "reserve"
+#
 
 # InfluxDB connection details
-INFLUX_HOST="reserve"
+INFLUX_HOST="${1:-reserve}"
 INFLUX_PORT="8086"
 INFLUX_DB="database"
 
@@ -50,6 +55,7 @@ smart_relative_time() {
   fi
 }
 
+echo "Connecting to InfluxDB at $INFLUX_HOST:$INFLUX_PORT (database: $INFLUX_DB)..." >&2
 echo "Fetching retention policies from database '$INFLUX_DB'..." >&2
 # Fetch all Retention Policies dynamically
 RPS_JSON=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
@@ -85,9 +91,12 @@ echo "Found ${#MEASUREMENTS[@]} measurements" >&2
 # Create markdown table header
 echo "# InfluxDB Retention Policy × Measurement × Fields Matrix" > $OUTPUT
 echo "" >> $OUTPUT
-echo "Database: **database**" >> $OUTPUT
+echo "Host: **$INFLUX_HOST:$INFLUX_PORT**  " >> $OUTPUT
+echo "Database: **$INFLUX_DB**" >> $OUTPUT
 echo "" >> $OUTPUT
 echo "Generated: $(date)" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "## Measurements per Retention Policy" >> $OUTPUT
 echo "" >> $OUTPUT
 echo "| Retention Policy | Measurement | Fields | Last Written |" >> $OUTPUT
 echo "|-----------------|-------------|--------|--------------|" >> $OUTPUT
@@ -95,6 +104,9 @@ echo "|-----------------|-------------|--------|--------------|" >> $OUTPUT
 # Counter for progress
 total=$((${#RPS[@]} * ${#MEASUREMENTS[@]}))
 current=0
+
+# Array to track used RPs
+declare -A used_rps
 
 # Iterate through all combinations
 for rp in "${RPS[@]}"; do
@@ -113,6 +125,9 @@ for rp in "${RPS[@]}"; do
     
     # Only process if fields exist
     if [ -n "$fields" ]; then
+      # Mark this RP as used
+      used_rps[$rp]=1
+      
       # Query for last timestamp
       last_query="SELECT * FROM \"$rp\".\"$measurement\" ORDER BY time DESC LIMIT 1"
       last_result=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
@@ -143,6 +158,23 @@ echo "- Possible Combinations: $total" >> $OUTPUT
 combinations_with_data=$(grep -c '^|' $OUTPUT)
 combinations_with_data=$((combinations_with_data - 2))  # Subtract header and separator lines
 echo "- Combinations with Data: $combinations_with_data" >> $OUTPUT
+
+# Add Retention Policy details (only used ones)
+echo "" >> $OUTPUT
+echo "---" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "## Retention Policies (in use)" >> $OUTPUT
+echo "" >> $OUTPUT
+echo "| Name | Duration | Shard Duration | Replication | Default |" >> $OUTPUT
+echo "|------|----------|----------------|-------------|---------|" >> $OUTPUT
+
+# Filter RPs to only show used ones
+for rp in "${!used_rps[@]}"; do
+  echo "$RPS_JSON" | jq -r --arg rp "$rp" '.results[0].series[0].values[]? | 
+    select(.[0] == $rp) |
+    "| \(.[0]) | \(.[1]) | \(.[2]) | \(.[3]) | \(if .[4] then "✓" else "" end) |"
+  '
+done | sort >> $OUTPUT
 
 # Fetch and write Continuous Queries
 echo "Fetching continuous queries..." >&2

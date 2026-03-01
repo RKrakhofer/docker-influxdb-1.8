@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# InfluxDB Data
+data/
+influxdb.conf
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Test/Import directories
+/tmp/
+test_data/
+backup/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

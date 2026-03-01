@@ -162,6 +162,70 @@ docker-compose up -d
    docker scout quickview influxdb:1.8-hardened
    ```
 
+## 💾 Data Export/Import (CSV Strategy)
+
+### Why CSV instead of Line Protocol?
+
+**Advantages:**
+- ✅ **Kompakter**: ~50-70% kleiner als Line Protocol Export
+- ✅ **Selektiv**: Export nur wichtiger Measurements statt ganzer RPs
+- ✅ **Einfacher Transfer**: Weniger Speicherplatz nötig
+- ✅ **Menschenlesbar**: CSV kann zur Inspektion geöffnet werden
+
+**Disadvantages:**
+- ❌ Pro Measurement einzeln (keine Batch-Operation)
+- ❌ Konvertierung zu Line Protocol nötig für Import
+- ❌ Tag vs Field Unterscheidung kann verloren gehen
+
+### Quick Start
+
+```bash
+# Zeige Export-Commands für Source-Server (VM)
+./csv_migration.sh export
+
+# Zeige Import-Commands für Target-Server (reserve)
+./csv_migration.sh import
+```
+
+### Full Workflow
+
+1. **Export auf VM (192.168.42.224):**
+   ```bash
+   ssh richard@192.168.42.224
+   ./csv_migration.sh export | bash
+   # Erstellt: /tmp/influx_csv_backup.tar.gz
+   ```
+
+2. **Transfer:**
+   ```bash
+   scp richard@192.168.42.224:/tmp/influx_csv_backup.tar.gz /tmp/
+   # Alternative: Via NAS mount
+   ```
+
+3. **Import auf reserve:**
+   ```bash
+   ./csv_migration.sh import | bash
+   # Importiert alle Measurements mit korrekten RPs
+   ```
+
+### Größenvergleich
+
+| Methode | Geschätzte Größe | Vorteile |
+|---------|------------------|----------|
+| Line Protocol (`influx_inspect export`) | ~1GB unkomprimiert | Exakte 1:1 Kopie, alle Metadaten |
+| CSV Export (selektiv) | ~100-300MB komprimiert | Platzsparend, schneller Transfer |
+| CSV Export (alle Measurements) | ~400-600MB komprimiert | Vollständig, aber kompakt |
+
+### Wichtigste Measurements (Empfehlung)
+
+Siehe [csv_migration.sh](csv_migration.sh) für vorkonfigurierte Liste:
+- `solaredge_modbus:I_AC_Power` (1 Jahr, ~200MB)
+- `weather:temperature` (5 Jahre, ~50MB)
+- `ret_solarpower:*` (90 Tage, ~30MB)
+- `auto_1d:*` (28 Tage, ~10MB)
+
+**Total:** ~300MB komprimiert
+
 ## License
 
 This project is licensed under the MIT License.
