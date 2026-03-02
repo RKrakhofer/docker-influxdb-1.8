@@ -20,10 +20,10 @@ services:
     # - INFLUX_USERNAME=dba - INFLUX_PASSWORD=supremo - INFLUXDB_UDP_ENABLED=false - INFLUXDB_UDP_BIND_ADDRESS=0.0.0.0:8086 - 
     # INFLUXDB_UDP_DATABASE=udp
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "/usr/local/bin/influx-healthcheck.sh"]
+      interval: 30m
+      timeout: 60s
+      retries: 2
     volumes:
     - influxdb-volume:/var/lib/influxdb
     network_mode: bridge

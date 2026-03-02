@@ -98,8 +98,8 @@ echo "Generated: $(date)" >> $OUTPUT
 echo "" >> $OUTPUT
 echo "## Measurements per Retention Policy" >> $OUTPUT
 echo "" >> $OUTPUT
-echo "| Retention Policy | Measurement | Fields | Last Written |" >> $OUTPUT
-echo "|-----------------|-------------|--------|--------------|" >> $OUTPUT
+echo "| Retention Policy | Measurement | Last Written | Count | Fields |" >> $OUTPUT
+echo "|-----------------|-------------|--------------|-------|--------|" >> $OUTPUT
 
 # Counter for progress
 total=$((${#RPS[@]} * ${#MEASUREMENTS[@]}))
@@ -143,7 +143,19 @@ for rp in "${RPS[@]}"; do
         relative_time="never"
       fi
       
-      echo "| $rp | $measurement | $fields | $relative_time |" >> $OUTPUT
+      # Query for count
+      count_query="SELECT COUNT(*) FROM \"$rp\".\"$measurement\""
+      count_result=$(curl -s -G "http://$INFLUX_HOST:$INFLUX_PORT/query" \
+        --data-urlencode "db=$INFLUX_DB" \
+        --data-urlencode "q=$count_query")
+      
+      # Extract count (max across all fields - they should all be the same)
+      count=$(echo "$count_result" | jq -r '[.results[0].series[0].values[0][]?] | map(select(type == "number")) | max // 0' 2>/dev/null)
+      
+      # Format count with thousands separator
+      count_formatted=$(printf "%'d" "$count" 2>/dev/null || echo "$count")
+      
+      echo "| $rp | $measurement | $relative_time | $count_formatted | $fields |" >> $OUTPUT
     fi
   done
 done
